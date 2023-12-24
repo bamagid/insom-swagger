@@ -1,0 +1,18 @@
+{
+    "name": "insomnia-docs-swagger",
+    "version": "1.0.0",
+    "description": "A simple script that converts Insomnia exported JSON to Swagger format, util to create simple docs",
+    "bin": "./insowagger.js",
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/bamagid/insomnia-docs-swagger.git"
+    },
+    "keywords": [
+      "insomnia",
+      "swagger",
+      "docs"
+    ],
+    "author": "Magid Ba",
+    "license": "i'm a developper",
+    "homepage": "hhttps://github.com/bamagid/insomnia-docs-swagger#readme"
+  }
