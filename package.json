@@ -1,11 +1,11 @@
 {
   "name": "insomswagger",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A command-line tool for converting JSON exported by Insomnia to Swagger format, as well as converting a swagger-formatted json file into a swagger-formatted annotation to facilitate documentation generation.",
   "main": "./insomwagger.js",
   "bin": "./insomwagger.js",
   "scripts": {
-     "insomswagger": "node ./insomwagger.js"
+    "insomswagger": "node ./insomwagger.js"
   },
   "repository": {
     "type": "git",
