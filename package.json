@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bamagid/insomnia-docs-swagger.git"
+    "url": "git+https://github.com/bamagid/insom-swagger.git"
   },
   "keywords": [
     "insomnia",
@@ -21,9 +21,9 @@
   ],
   "author": "Magid Ba",
   "license": "SEE LICENSE IN License.md",
-  "homepage": "https://github.com/bamagid/insomnia-docs-swagger#readme",
+  "homepage": "https://github.com/bamagid/insom-swagger#readme",
   "bugs": {
-    "url": "https://github.com/bamagid/insomnia-docs-swagger/issues"
+    "url": "https://github.com/bamagid/insom-swagger/issues"
   },
   "engines": {
     "node": ">=12.0.0"
