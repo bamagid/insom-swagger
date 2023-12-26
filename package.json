@@ -5,7 +5,7 @@
   "main": "./insomwagger.js",
   "bin": "./insomwagger.js",
   "scripts": {
-     "insomswagger": "node ./insomwagger.js",
+     "insomswagger": "node ./insomwagger.js"
   },
   "repository": {
     "type": "git",
