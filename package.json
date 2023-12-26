@@ -1,18 +1,32 @@
 {
-    "name": "insomnia-docs-swagger",
-    "version": "1.0.0",
-    "description": "A simple script that converts Insomnia exported JSON to Swagger format, util to create simple docs",
-    "bin": "./insowagger.js",
-    "repository": {
-      "type": "git",
-      "url": "git+https://github.com/bamagid/insomnia-docs-swagger.git"
-    },
-    "keywords": [
-      "insomnia",
-      "swagger",
-      "docs"
-    ],
-    "author": "Magid Ba",
-    "license": "i'm a developper",
-    "homepage": "hhttps://github.com/bamagid/insomnia-docs-swagger#readme"
-  }
+  "name": "insomswagger",
+  "version": "1.0.0",
+  "description": "A command-line tool for converting JSON exported by Insomnia to Swagger format, as well as converting a swagger-formatted json file into a swagger-formatted annotation to facilitate documentation generation.",
+  "main": "./insomwagger.js",
+  "bin": {
+    "insomswagger": "./insomwagger.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bamagid/insomnia-docs-swagger.git"
+  },
+  "keywords": [
+    "insomnia",
+    "swagger",
+    "docs",
+    "documentation"
+  ],
+  "author": "Magid Ba",
+  "license": "SEE LICENSE IN License.md",
+  "homepage": "https://github.com/bamagid/insomnia-docs-swagger#readme",
+  "bugs": {
+    "url": "https://github.com/bamagid/insomnia-docs-swagger/issues"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "dependencies": {}
+}
