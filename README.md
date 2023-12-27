@@ -20,6 +20,10 @@ To utilize the package, follow these steps:
    npm install -g insomswagger
    ```
 
+   ```bash
+   npm install -g insomswagger
+   ```
+
 2. Navigate to the directory containing your input file.
 
 3. Run the following command:
