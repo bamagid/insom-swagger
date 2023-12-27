@@ -2,11 +2,66 @@
 const fs = require("fs");
 let [, , option, inputPath, outputPath = "./api-docs.json"] = process.argv;
 
-if (!inputPath) {
-  throw new Error("Missing Input Path argument!");
-}
+if (option === "install") {
+  const { exec } = require("child_process");
+  const open = require("open");
 
-if (option === "-j") {
+  // Commande Composer pour installer darkaonline/l5-swagger
+  const composerCommand = 'composer require "darkaonline/l5-swagger"';
+
+  // Commande Artisan pour publier les fichiers de configuration
+  const artisanCommand =
+    'php artisan vendor:publish --provider "L5SwaggerL5SwaggerServiceProvider"';
+
+  // Commande Artisan pour démarrer le serveur
+  const serveCommand = "php artisan serve";
+
+  // Fonction pour exécuter une commande
+  function runCommand(command) {
+    return new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            `Erreur lors de l'exécution de la commande : ${error.message}`
+          );
+        } else {
+          resolve(stdout || stderr);
+        }
+      });
+    });
+  }
+
+  // Fonction principale pour exécuter les commandes
+  async function installL5SwaggerAndServe() {
+    try {
+      // Exécutez la commande Composer
+      const composerOutput = await runCommand(composerCommand);
+      console.log("Composer Output:", composerOutput);
+
+      // Exécutez la commande Artisan
+      const artisanOutput = await runCommand(artisanCommand);
+      console.log("Artisan Output:", artisanOutput);
+
+      // Exécutez la commande Artisan pour démarrer le serveur
+      const serveOutput = await runCommand(serveCommand);
+      console.log("Serve Output:", serveOutput);
+      console.log(
+        "darkaonline/l5-swagger installé avec succès. Serveur en cours d'exécution."
+      );
+
+      // Ouvrir automatiquement le navigateur avec l'URL spécifiée
+      await open("http://127.0.0.1:8000/api/documentation");
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  // Appelez la fonction principale
+  installL5SwaggerAndServe();
+} else if (option === "-j") {
+  if (!inputPath) {
+    throw new Error("Missing Input Path argument!");
+  }
   // Script de génération Swagger
   const BASE_URL = "http://127.0.0.1:8000/";
 
@@ -144,6 +199,9 @@ if (option === "-j") {
     `Documentation Swagger générée et écrite dans le fichier json avec succès: ${outputPath}`
   );
 } else if (option === "-a") {
+  if (!inputPath) {
+    throw new Error("Missing Input Path argument!");
+  }
   //verifier si le fichier de sortie a été specifié
   if (outputPath === "./api-docs.json") {
     outputPath = "./annotations.php";
