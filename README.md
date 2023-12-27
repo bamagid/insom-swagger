@@ -77,16 +77,16 @@ Here are a few examples of how to use the package:
 
 - For Swagger PHP Annotations:
     ```bash
-    npm insomswagger -a insomnia-export.json my-annotations.php
+    npm run insomswagger -a insomnia-export.json my-annotations.php
     ```
 
 - For Swagger JSON:
     ```bash
-    npm insomswagger -j insomnia-export.json my-api-docs.json
+    npm run insomswagger -j insomnia-export.json my-api-docs.json
     ```
 - For Darkaonline/l5-swagger installation:
     ```bash
-    npm insomswagger install
+    npm run insomswagger install
     ```
 
 ## License
