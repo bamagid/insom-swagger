@@ -1,7 +1,6 @@
 # Insomswagger
 
 ## Introduction
-
 Insomswagger is a versatile Node.js package designed to simplify the process of converting exported JSON from Insomnia into Swagger documentation. This utility offers flexibility by allowing users to generate either Swagger JSON files or PHP annotations based on their specific needs.
 
 Whether you prefer a clean Swagger JSON representation or you're working within a PHP environment using annotations, this package has you covered. Easily create clear and concise API documentation tailored to your project requirements.
