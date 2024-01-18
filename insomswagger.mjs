@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-import open from 'open';
-import fs from 'fs';
-import { exec } from 'child_process';
+import open from "open";
+import fs from "fs";
+import { exec } from "child_process";
+import yaml from "js-yaml";
 let [, , option, inputPath, outputPath = "./api-docs.json"] = process.argv;
 if (option === "install") {
   // Commande Composer pour installer darkaonline/l5-swagger
   const composerCommand = 'composer require "darkaonline/l5-swagger"';
   // Commande Artisan pour publier les fichiers de configuration
-  const artisanCommand = 'php artisan vendor:publish --provider "L5Swagger\\L5SwaggerServiceProvider"';
+  const artisanCommand =
+    'php artisan vendor:publish --provider "L5Swagger\\L5SwaggerServiceProvider"';
   // Commande Artisan pour démarrer le serveur
   const serveCommand = "php artisan serve";
   // Fonction pour exécuter une commande
@@ -36,11 +38,11 @@ if (option === "install") {
       // Exécutez la commande Artisan pour démarrer le serveur
       console.log(
         "darkaonline/l5-swagger installé avec succès. Serveur en cours d'exécution."
-        );
-        // Ouvrir automatiquement le navigateur avec l'URL spécifiée
-        await open("http://127.0.0.1:8000/api/documentation");
+      );
+      // Ouvrir automatiquement le navigateur avec l'URL spécifiée
+      await open("http://127.0.0.1:8000/api/documentation");
       const serveOutput = await runCommand(serveCommand);
-        console.log("Serve Output:", serveOutput);
+      console.log("Serve Output:", serveOutput);
     } catch (error) {
       console.error(error);
     }
@@ -52,11 +54,39 @@ if (option === "install") {
     throw new Error("Missing Input Path argument!");
   }
   // Script de génération Swagger
-  const BASE_URL = "http://127.0.0.1:8000/";
+  const BASE_URL = "http://127.0.0.1:8000";
 
   const file = JSON.parse(
     fs.readFileSync(inputPath, { encoding: "utf8", flag: "r" })
   );
+  function generateResponseExample(item) {
+    const method = item.method ? item.method.toUpperCase() : "GET";
+
+    let status, description;
+
+    if (method === "POST") {
+      status = 201;
+      description = "Created successfully";
+    } else if (method === "DELETE") {
+      status = 204;
+      description = "Deleted successfully";
+    } else {
+      status = 200;
+      description = "OK";
+    }
+
+    return {
+      [status]: {
+        description: description,
+        content: {
+          "application/json": {
+            schema: {},
+            example: "",
+          },
+        },
+      },
+    };
+  }
 
   const URL_REGEXP = /(?:https?:\/\/[^/]+)?(\/[\w-_/]+)$/;
 
@@ -84,31 +114,20 @@ if (option === "install") {
     consumes: ["application/json"],
     paths: file.resources.reduce((ac, item) => {
       if (!item.url || !item.method) {
-        // console.error("Skipping invalid resource:", item);
         return ac;
       }
       const match = URL_REGEXP.exec(item.url);
       const extractedUrl = match ? match[0] : "";
       // Ajoute le chemin relatif à l'objet ac sans la base URL
-      const key = extractedUrl.slice(BASE_URL.length);
+      const key = extractedUrl.startsWith(BASE_URL)
+        ? extractedUrl.slice(BASE_URL.length)
+        : extractedUrl;
       ac[key] = ac[key] || {};
       item.method = item.method.toLowerCase();
       ac[key][item.method] = {
         summary: item.name || "",
         description: item.description || "",
-        produces: ["application/json"],
-        responses: {
-          200: {
-            content: {
-              "application/json": {
-                examples: {
-                  "application/json": "",
-                },
-              },
-            },
-            description: "Success",
-          },
-        },
+        responses: generateResponseExample(item),
         tags: [
           item.parentId
             ? file.resources.find((resource) => resource._id === item.parentId)
@@ -195,6 +214,22 @@ if (option === "install") {
   console.log(
     `Annotations Swagger générées et écrites dans le fichier PHP avec succès: ${outputPath}`
   );
+} else if (option === "-y") {
+  if (!inputPath) {
+    throw new Error("Missing Input Path argument!");
+  }
+  if (outputPath === "./api-docs.json") {
+    outputPath = "./api-docs.yaml";
+  }
+  const file = JSON.parse(
+    fs.readFileSync(inputPath, { encoding: "utf8", flag: "r" })
+  );
+  const yamlData = yaml.dump(file);
+  outputPath = outputPath.replace(".json", ".yaml");
+  fs.writeFileSync(outputPath, yamlData);
+  console.log(
+    `Swagger JSON file successfully converted to YAML and written to: ${outputPath}`
+  );
 } else {
   console.error(
     "Invalid option. Use -s for Swagger json documentation or -a for Swagger annotations documenation."
@@ -265,18 +300,28 @@ function generatePhpAnnotations(swaggerData) {
           responseCodes.forEach((responseCode) => {
             const response = operation.responses[responseCode];
             const responseDescription = response.description || "";
-            phpAnnotations += ` *     @OA\\Response(response="${responseCode}", description="${responseDescription}"`;
+
+            phpAnnotations += ` * @OA\\Response(response="${responseCode}", description="${responseDescription}"`;
+
             // Générer les annotations pour le contenu de la réponse
             if (response.content) {
               const contentTypes = Object.keys(response.content);
+
               if (contentTypes.length > 0) {
-                phpAnnotations += ", @OA\\JsonContent(";
-                phpAnnotations += `example="${
-                  response.content[contentTypes[0]].examples["application/json"]
-                }"`;
-                phpAnnotations += ")";
+                const firstContentType = contentTypes[0];
+
+                if (response.content[firstContentType].examples) {
+                  const examples = response.content[firstContentType].examples;
+
+                  if (examples["application/json"]) {
+                    phpAnnotations += ", @OA\\JsonContent(";
+                    phpAnnotations += `example="${examples["application/json"]}"`;
+                    phpAnnotations += ")";
+                  }
+                }
               }
             }
+
             phpAnnotations += ")\n";
           });
         }
