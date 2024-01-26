@@ -41,6 +41,14 @@ To utilize the package, follow these steps:
 
    If `outputFilePath` is not provided, the default names (`annotations.php` for -a ,api-docs.yaml for -y and `api-docs.json` for -j) will be used.
 
+   - To Update an Existing Installation:
+
+   ```bash
+     insomswagger update
+   ```
+
+   This command will update this package to the latest version.
+
 ## Tips for Organizing Files in Insomnia
 
 For optimal results when generating annotations, consider organizing your files in Insomnia:

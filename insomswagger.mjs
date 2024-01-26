@@ -49,6 +49,43 @@ if (option === "install") {
   }
   // Appelez la fonction principale
   installL5SwaggerAndServe();
+} else if (option === "update") {
+  function runCommand(command) {
+    return new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          reject(
+            `Erreur lors de l'exécution de la commande : ${error.message}`
+          );
+        } else {
+          resolve(stdout || stderr);
+        }
+      });
+    });
+  }
+
+  const npmUninstallCommand = "npm uninstall -g insomswagger";
+  const npmInstallCommand = "npm install -g insomswagger";
+
+  // Fonction pour exécuter une commande npm
+  async function runNpmCommand(command) {
+    try {
+      const result = await runCommand(command);
+      console.log(`La commande a été exécutée avec succès: ${result}`);
+    } catch (error) {
+      console.error(`Erreur lors de l'exécution de la commande npm : ${error}`);
+    }
+  }
+
+  // Exécute la commande npm uninstall
+  runNpmCommand(npmUninstallCommand)
+    .then(() => {
+      // Après la désinstallation, exécute la commande npm install
+      return runNpmCommand(npmInstallCommand);
+    })
+    .catch((error) => {
+      console.error(`Une erreur est survenue : ${error}`);
+    });
 } else if (option === "-j") {
   if (!inputPath) {
     throw new Error("Missing Input Path argument!");
