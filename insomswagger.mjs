@@ -53,42 +53,103 @@ if (option === "install") {
   if (!inputPath) {
     throw new Error("Missing Input Path argument!");
   }
-  // Script de génération Swagger
+
   const BASE_URL = "http://127.0.0.1:8000";
 
   const file = JSON.parse(
     fs.readFileSync(inputPath, { encoding: "utf8", flag: "r" })
   );
+
   function generateResponseExample(item) {
     const method = item.method ? item.method.toUpperCase() : "GET";
+    const responses = [];
 
-    let status, description;
-
-    if (method === "POST") {
-      status = 201;
-      description = "Created successfully";
-    } else if (method === "DELETE") {
-      status = 204;
-      description = "Deleted successfully";
-    } else {
-      status = 200;
-      description = "OK";
+    switch (method) {
+      case "POST":
+        responses.push({ status: 201, description: "Created successfully" });
+        responses.push({ status: 400, description: "Bad Request" });
+        responses.push({ status: 401, description: "Unauthenticated" });
+        responses.push({ status: 403, description: "Unauthorize" });
+        break;
+      case "DELETE":
+        responses.push({ status: 204, description: "Deleted successfully" });
+        responses.push({ status: 404, description: "Not Found" });
+        responses.push({ status: 401, description: "Unauthenticated" });
+        responses.push({ status: 403, description: "Unauthorize" });
+        break;
+      default:
+        responses.push({ status: 200, description: "OK" });
+        responses.push({ status: 404, description: "Not Found" });
+        responses.push({ status: 500, description: "Internal Server Error" });
+        break;
     }
 
-    return {
-      [status]: {
-        description: description,
+    const responseExamples = {};
+    responses.forEach((response) => {
+      responseExamples[response.status] = {
+        description: response.description,
         content: {
           "application/json": {
             schema: {},
             example: "",
           },
         },
-      },
-    };
+      };
+    });
+
+    return responseExamples;
   }
 
-  const URL_REGEXP = /(?:https?:\/\/[^/]+)?(\/[\w-_/]+)$/;
+  const URL_REGEXP = /(?:https?:\/\/[^/]+)?(\/[\w-_/{}]+)$/;
+
+  function generateRequestBody(item) {
+    if (item.body?.text || item.body?.params) {
+      let json;
+
+      if (item.body.text) {
+        try {
+          json = JSON.parse(item.body.text);
+        } catch (error) {
+          console.error("Error parsing JSON for resource:", item);
+          return null;
+        }
+      } else if (item.body.params) {
+        json = item.body.params.reduce((acc, param) => {
+          acc[param.name] = param.value;
+          if (param.type === "file") {
+            acc[param.name] = { type: "string", format: "binary" };
+          }
+          return acc;
+        }, {});
+      }
+
+      return {
+        content: {
+          "multipart/form-data": {
+            schema: {
+              type: "object",
+              properties: Object.entries(json).reduce((ac, [k, v]) => {
+                switch (typeof v) {
+                  case "number":
+                    ac[k] = { type: "integer" };
+                    break;
+                  case "object":
+                    ac[k] = { type: "string", format: "binary" };
+                    break;
+                  default:
+                    ac[k] = { type: typeof v };
+                }
+                return ac;
+              }, {}),
+            },
+            example: json,
+          },
+        },
+      };
+    }
+
+    return null;
+  }
 
   const swagger = {
     openapi: "3.0.0",
@@ -111,19 +172,21 @@ if (option === "install") {
         },
       },
     },
-    consumes: ["application/json"],
+    consumes: ["multipart/form-data"],
     paths: file.resources.reduce((ac, item) => {
       if (!item.url || !item.method) {
         return ac;
       }
+
       const match = URL_REGEXP.exec(item.url);
       const extractedUrl = match ? match[0] : "";
-      // Ajoute le chemin relatif à l'objet ac sans la base URL
       const key = extractedUrl.startsWith(BASE_URL)
         ? extractedUrl.slice(BASE_URL.length)
         : extractedUrl;
+
       ac[key] = ac[key] || {};
       item.method = item.method.toLowerCase();
+
       ac[key][item.method] = {
         summary: item.name || "",
         description: item.description || "",
@@ -135,7 +198,9 @@ if (option === "install") {
             : "",
         ],
       };
+
       ac[key][item.method].parameters = [];
+
       if (item.parameters && item.parameters.length) {
         ac[key][item.method].parameters.push(
           ...item.parameters.map((param) => ({
@@ -145,6 +210,7 @@ if (option === "install") {
           }))
         );
       }
+
       if (item.headers && item.headers.length) {
         ac[key][item.method].parameters.push(
           ...item.headers
@@ -156,43 +222,19 @@ if (option === "install") {
             }))
         );
       }
-      if (item.body?.text) {
-        let json;
-        try {
-          json = JSON.parse(item.body.text);
-        } catch (error) {
-          console.error("Error parsing JSON for resource:", item);
-          return ac;
-        }
-        ac[key][item.method].requestBody = {
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: Object.entries(json).reduce(
-                  (ac, [k, v]) => ({
-                    ...ac,
-                    [k]: (() => {
-                      switch (typeof v) {
-                        case "number":
-                          return "integer";
-                        default:
-                          return { type: typeof v };
-                      }
-                    })(),
-                  }),
-                  {}
-                ),
-              },
-              example: json,
-            },
-          },
-        };
+
+      const requestBody = generateRequestBody(item);
+
+      if (requestBody) {
+        ac[key][item.method].requestBody = requestBody;
       }
 
       return ac;
     }, {}),
   };
+
+  // Reste du code inchangé
+
   fs.writeFileSync(outputPath, JSON.stringify(swagger, null, 4));
   console.log(
     `Documentation Swagger générée et écrite dans le fichier json avec succès: ${outputPath}`
@@ -341,21 +383,43 @@ function generatePhpAnnotations(swaggerData) {
         if (operation.requestBody) {
           const requestBody = operation.requestBody;
           const contentTypes = Object.keys(requestBody.content);
-          const example = JSON.stringify(
-            requestBody.content[contentTypes[0]].example,
-            null,
-            4
-          )
-            .split("\n")
-            .map((line) => ` *${line ? ` ${line}` : ""}`)
-            .join("\n");
 
           phpAnnotations += ` *     @OA\\RequestBody(\n`;
           phpAnnotations += ` *         required=true,\n`;
-          phpAnnotations += ` *         @OA\\JsonContent(\n`;
-          phpAnnotations += ` *             example=\n`;
-          phpAnnotations += ` ${example}\n`;
-          phpAnnotations += ` *         )\n`;
+
+          if (contentTypes.length > 0) {
+            const firstContentType = contentTypes[0];
+
+            if (firstContentType === "multipart/form-data") {
+              phpAnnotations += ` *         @OA\\MediaType(\n`;
+              phpAnnotations += ` *             mediaType="${firstContentType}",\n`;
+              phpAnnotations += ` *             @OA\\Schema(\n`;
+              phpAnnotations += ` *                 type="object",\n`;
+              phpAnnotations += ` *                 properties={\n`;
+
+              // Générer les annotations pour chaque propriété du formulaire
+              const formProperties =
+                requestBody.content[firstContentType].schema.properties;
+              Object.keys(formProperties).forEach((propertyName) => {
+                const property = formProperties[propertyName];
+                const propertyType = property.type || "string";
+
+                phpAnnotations += ` *                     @OA\\Property(property="${propertyName}", type="${propertyType}"`;
+
+                // Si le type est "file", spécifier le format comme "binary"
+                if (property.format === "binary") {
+                  phpAnnotations += `, format="binary"`;
+                }
+
+                phpAnnotations += `),\n`;
+              });
+
+              phpAnnotations += ` *                 },\n`;
+              phpAnnotations += ` *             ),\n`;
+              phpAnnotations += ` *         ),\n`;
+            }
+          }
+
           phpAnnotations += ` *     ),\n`;
         }
         // Générer les annotations pour les tags
