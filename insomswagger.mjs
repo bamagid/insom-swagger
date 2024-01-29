@@ -54,9 +54,7 @@ if (option === "install") {
     return new Promise((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {
-          reject(
-            `Erreur lors de l'exécution de la commande : ${error.message}`
-          );
+          reject(`${error.message}`);
         } else {
           resolve(stdout || stderr);
         }
@@ -69,12 +67,17 @@ if (option === "install") {
 
   // Fonction pour exécuter une commande npm
   async function runNpmCommand(command) {
-    try {
-      const result = await runCommand(command);
-      console.log(`La commande a été exécutée avec succès: ${result}`);
-    } catch (error) {
-      console.error(`Erreur lors de l'exécution de la commande npm : ${error}`);
-    }
+    runNpmCommand(npmUninstallCommand)
+      .then((uninstallResult) => {
+        // Après la désinstallation, exécute la commande npm install
+        return runNpmCommand(npmInstallCommand);
+      })
+      .then((installResult) => {
+        console.log(`Mise à jour effectuée avec succès: ${installResult}`);
+      })
+      .catch((error) => {
+        console.error(`Une erreur est survenue : ${error}`);
+      });
   }
 
   // Exécute la commande npm uninstall
@@ -159,10 +162,14 @@ if (option === "install") {
           return acc;
         }, {});
       }
-
+      const contentType =
+        item.method.toUpperCase() === "PUT" ||
+        item.method.toUpperCase() === "PATCH"
+          ? "application/x-www-form-urlencoded"
+          : "multipart/form-data";
       return {
         content: {
-          "multipart/form-data": {
+          [contentType]: {
             schema: {
               type: "object",
               properties: Object.entries(json).reduce((ac, [k, v]) => {
@@ -325,38 +332,35 @@ function generatePhpAnnotations(swaggerData) {
       phpAnnotations += "/**\n * @OA\\Security(\n";
       phpAnnotations += " *     security={\n";
       phpAnnotations += ` *         "${schemeName}": {}\n`;
-      phpAnnotations += " *     },\n";
-      phpAnnotations += " */\n\n\n";
-      phpAnnotations += "/**\n * @OA\\SecurityScheme(\n";
+      phpAnnotations += " *     }),\n";
+      phpAnnotations += "\n * @OA\\SecurityScheme(\n";
       phpAnnotations += ` *     securityScheme="${schemeName}",\n`;
       phpAnnotations += ` *     type="${securityScheme.type}",\n`;
       phpAnnotations += ` *     scheme="${securityScheme.scheme}",\n`;
-      phpAnnotations += ` *     bearerFormat="${securityScheme.bearerFormat}"\n`;
-      phpAnnotations += " */\n\n\n";
+      phpAnnotations += ` *     bearerFormat="${securityScheme.bearerFormat}"),\n`;
     });
   }
   // Générer les annotations d'information
   if (swaggerData.info) {
-    phpAnnotations += "/**\n * @OA\\Info(\n";
+    phpAnnotations += "\n * @OA\\Info(\n";
     const info = swaggerData.info;
     phpAnnotations += ` *     title="${info.title}",\n`;
     phpAnnotations += ` *     description="${info.description}",\n`;
-    phpAnnotations += ` *     version="${info.version}"\n`;
-    phpAnnotations += " */\n\n\n";
+    phpAnnotations += ` *     version="${info.version}"),\n`;
   }
   // Générer les annotations de consommation
   if (swaggerData.consumes) {
-    phpAnnotations += "/**\n * @OA\\Consumes({\n";
+    phpAnnotations += "\n * @OA\\Consumes({\n";
     phpAnnotations += ` *     "${swaggerData.consumes.join('","')}"\n`;
-    phpAnnotations += " * })\n */\n\n\n";
+    phpAnnotations += " * }),\n */\n\n\n";
   }
   // Générer les annotations de tags
   if (swaggerData.tags) {
     swaggerData.tags.forEach((tag) => {
-      phpAnnotations += "/**\n * @OA\\Tag(\n";
+      phpAnnotations += "\n * @OA\\Tag(\n";
       phpAnnotations += ` *     name="${tag.name}",\n`;
       phpAnnotations += ` *     description="${tag.description}"\n`;
-      phpAnnotations += " * )\n */\n\n\n";
+      phpAnnotations += " * ),\n */\n\n\n";
     });
   }
   // Générer les annotations de chemin
@@ -373,6 +377,10 @@ function generatePhpAnnotations(swaggerData) {
         phpAnnotations += ` *     path="${path}",\n`;
         phpAnnotations += ` *     summary="${summary}",\n`;
         phpAnnotations += ` *     description="${description}",\n`;
+        // Générer les annotations pour la sécurité
+        phpAnnotations += ` *         security={\n`;
+        phpAnnotations += ` *    {       "BearerAuth": {}}\n`;
+        phpAnnotations += ` *         },\n`;
         // Générer les annotations pour les réponses
         if (operation.responses) {
           const responseCodes = Object.keys(operation.responses);
@@ -395,13 +403,13 @@ function generatePhpAnnotations(swaggerData) {
                   if (examples["application/json"]) {
                     phpAnnotations += ", @OA\\JsonContent(";
                     phpAnnotations += `example="${examples["application/json"]}"`;
-                    phpAnnotations += ")";
+                    phpAnnotations += "),";
                   }
                 }
               }
             }
 
-            phpAnnotations += ")\n";
+            phpAnnotations += "),\n";
           });
         }
         // Générer les annotations pour les paramètres
@@ -413,7 +421,7 @@ function generatePhpAnnotations(swaggerData) {
             const parameterRequired = parameter.required ? "true" : "false";
             phpAnnotations += ` *     @OA\\Parameter(in="${inType}", name="${parameterName}", `;
             phpAnnotations += `required=${parameterRequired}, @OA\\Schema(type="${parameterType}")\n`;
-            phpAnnotations += " * )\n";
+            phpAnnotations += " * ),\n";
           });
         }
         // Générer les annotations pour le requestBody
@@ -426,54 +434,47 @@ function generatePhpAnnotations(swaggerData) {
 
           if (contentTypes.length > 0) {
             const firstContentType = contentTypes[0];
-
-            if (firstContentType === "multipart/form-data") {
-              phpAnnotations += ` *         @OA\\MediaType(\n`;
-              phpAnnotations += ` *             mediaType="${firstContentType}",\n`;
-              phpAnnotations += ` *             @OA\\Schema(\n`;
-              phpAnnotations += ` *                 type="object",\n`;
-              phpAnnotations += ` *                 properties={\n`;
-
-              // Générer les annotations pour chaque propriété du formulaire
-              const formProperties =
-                requestBody.content[firstContentType].schema.properties;
-              Object.keys(formProperties).forEach((propertyName) => {
-                const property = formProperties[propertyName];
-                const propertyType = property.type || "string";
-
-                phpAnnotations += ` *                     @OA\\Property(property="${propertyName}", type="${propertyType}"`;
-
-                // Si le type est "file", spécifier le format comme "binary"
-                if (property.format === "binary") {
-                  phpAnnotations += `, format="binary"`;
-                }
-
-                phpAnnotations += `),\n`;
-              });
-
-              phpAnnotations += ` *                 },\n`;
-              phpAnnotations += ` *             ),\n`;
-              phpAnnotations += ` *         ),\n`;
+            let contentType;
+            if (
+              method.toUpperCase() === "PUT" ||
+              method.toUpperCase() === "PATCH"
+            ) {
+              contentType = "application/x-www-form-urlencoded";
+            } else {
+              contentType = "multipart/form-data";
             }
+            phpAnnotations += ` *         @OA\\MediaType(\n`;
+            phpAnnotations += ` *             mediaType="${contentType}",\n`;
+            phpAnnotations += ` *             @OA\\Schema(\n`;
+            phpAnnotations += ` *                 type="object",\n`;
+            phpAnnotations += ` *                 properties={\n`;
+
+            // Générer les annotations pour chaque propriété du formulaire
+            const formProperties =
+              requestBody.content[firstContentType].schema.properties;
+            Object.keys(formProperties).forEach((propertyName) => {
+              const property = formProperties[propertyName];
+              const propertyType = property.type || "string";
+
+              phpAnnotations += ` *                     @OA\\Property(property="${propertyName}", type="${propertyType}"`;
+              if (property.format === "binary") {
+                phpAnnotations += `, format="binary"`;
+              }
+
+              phpAnnotations += `),\n`;
+            });
+
+            phpAnnotations += ` *                 },\n`;
+            phpAnnotations += ` *             ),\n`;
+            phpAnnotations += ` *         ),\n`;
           }
 
           phpAnnotations += ` *     ),\n`;
         }
-        // Générer les annotations pour les tags
         if (operation.tags) {
           phpAnnotations += ` *     tags={"${operation.tags.join('","')}"},\n`;
         }
-        // Générer les annotations pour la sécurité
-        if (operation.security) {
-          phpAnnotations += " *     security={{";
-          const securityRequirements = operation.security[0];
-          const securityNames = Object.keys(securityRequirements);
-          securityNames.forEach((securityName) => {
-            phpAnnotations += ` "${securityName}": {}`;
-          });
-          phpAnnotations += " }},\n";
-        }
-        phpAnnotations += " * )\n */\n\n\n";
+        phpAnnotations += `*),\n */\n\n`;
       });
     });
   }
