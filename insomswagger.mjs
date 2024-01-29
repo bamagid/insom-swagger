@@ -67,17 +67,14 @@ if (option === "install") {
 
   // Fonction pour exécuter une commande npm
   async function runNpmCommand(command) {
-    runNpmCommand(npmUninstallCommand)
-      .then((uninstallResult) => {
-        // Après la désinstallation, exécute la commande npm install
-        return runNpmCommand(npmInstallCommand);
-      })
-      .then((installResult) => {
-        console.log(`Mise à jour effectuée avec succès: ${installResult}`);
-      })
-      .catch((error) => {
-        console.error(`Une erreur est survenue : ${error}`);
-      });
+    try {
+      const uninstallResult = await runCommand(command);
+      // Après la désinstallation, exécute la commande npm install
+      const installResult = await runCommand(npmInstallCommand);
+      console.log(`${installResult}`);
+    } catch (error) {
+      console.error(`${error}`);
+    }
   }
 
   // Exécute la commande npm uninstall
@@ -87,7 +84,7 @@ if (option === "install") {
       return runNpmCommand(npmInstallCommand);
     })
     .catch((error) => {
-      console.error(`Une erreur est survenue : ${error}`);
+      console.error(`${error}`);
     });
 } else if (option === "-j") {
   if (!inputPath) {
