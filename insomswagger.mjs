@@ -5,12 +5,10 @@ import { exec } from "child_process";
 import yaml from "js-yaml";
 let [, , option, inputPath, outputPath = "./api-docs.json"] = process.argv;
 if (option === "install") {
-  // Commande Composer pour installer darkaonline/l5-swagger
   const composerCommand = 'composer require "darkaonline/l5-swagger"';
-  // Commande Artisan pour publier les fichiers de configuration
   const artisanCommand =
     'php artisan vendor:publish --provider "L5Swagger\\L5SwaggerServiceProvider"';
-  // Commande Artisan pour démarrer le serveur
+  const optimizeCommand = "php artisan optimize:clear";
   const serveCommand = "php artisan serve";
   // Fonction pour exécuter une commande
   function runCommand(command) {
@@ -35,6 +33,9 @@ if (option === "install") {
       // Exécutez la commande Artisan
       const artisanOutput = await runCommand(artisanCommand);
       console.log("Artisan Output:", artisanOutput);
+      // Exécutez la commande Optimize
+      const optimizeCommand = await runCommand(optimizeCommand);
+      console.log("Optimize Output:", optimizeCommand);
       // Exécutez la commande Artisan pour démarrer le serveur
       console.log(
         "darkaonline/l5-swagger installé avec succès. Serveur en cours d'exécution."
@@ -42,7 +43,7 @@ if (option === "install") {
       // Ouvrir automatiquement le navigateur avec l'URL spécifiée
       await open("http://127.0.0.1:8000/api/documentation");
       const serveOutput = await runCommand(serveCommand);
-      console.log("Serve Output:", serveOutput);
+      console.log("Serve Output: ", serveOutput);
     } catch (error) {
       console.error(error);
     }
@@ -68,7 +69,7 @@ if (option === "install") {
   // Fonction pour exécuter une commande npm
   async function runNpmCommand(command) {
     try {
-      const uninstallResult = await runCommand(command);
+      await runCommand(command);
       // Après la désinstallation, exécute la commande npm install
       const installResult = await runCommand(npmInstallCommand);
       console.log(`${installResult}`);
@@ -76,7 +77,6 @@ if (option === "install") {
       console.error(`${error}`);
     }
   }
-
   // Exécute la commande npm uninstall
   runNpmCommand(npmUninstallCommand)
     .then(() => {
@@ -90,13 +90,9 @@ if (option === "install") {
   if (!inputPath) {
     throw new Error("Missing Input Path argument!");
   }
-
-  const BASE_URL = "http://127.0.0.1:8000";
-
   const file = JSON.parse(
     fs.readFileSync(inputPath, { encoding: "utf8", flag: "r" })
   );
-
   function generateResponseExample(item) {
     const method = item.method ? item.method.toUpperCase() : "GET";
     const responses = [];
@@ -105,14 +101,14 @@ if (option === "install") {
       case "POST":
         responses.push({ status: 201, description: "Created successfully" });
         responses.push({ status: 400, description: "Bad Request" });
-        responses.push({ status: 401, description: "Unauthenticated" });
-        responses.push({ status: 403, description: "Unauthorize" });
+        responses.push({ status: 401, description: "Unauthorized" });
+        responses.push({ status: 403, description: "Forbidden" });
         break;
       case "DELETE":
         responses.push({ status: 204, description: "Deleted successfully" });
         responses.push({ status: 404, description: "Not Found" });
-        responses.push({ status: 401, description: "Unauthenticated" });
-        responses.push({ status: 403, description: "Unauthorize" });
+        responses.push({ status: 401, description: "Unauthorized" });
+        responses.push({ status: 403, description: "Forbidden" });
         break;
       default:
         responses.push({ status: 200, description: "OK" });
@@ -136,13 +132,9 @@ if (option === "install") {
 
     return responseExamples;
   }
-
-  const URL_REGEXP = /(?:https?:\/\/[^/]+)?(\/[\w-_/{}]+)$/;
-
   function generateRequestBody(item) {
     if (item.body?.text || item.body?.params) {
       let json;
-
       if (item.body.text) {
         try {
           json = JSON.parse(item.body.text);
@@ -219,11 +211,10 @@ if (option === "install") {
         return ac;
       }
 
-      const match = URL_REGEXP.exec(item.url);
-      const extractedUrl = match ? match[0] : "";
-      const key = extractedUrl.startsWith(BASE_URL)
-        ? extractedUrl.slice(BASE_URL.length)
-        : extractedUrl;
+      const indexOfApi = item.url.indexOf("/api/");
+      const extractedUrl =
+        indexOfApi !== -1 ? item.url.substring(indexOfApi) : item.url;
+      const key = extractedUrl;
 
       ac[key] = ac[key] || {};
       item.method = item.method.toLowerCase();
@@ -239,9 +230,7 @@ if (option === "install") {
             : "",
         ],
       };
-
       ac[key][item.method].parameters = [];
-
       if (item.parameters && item.parameters.length) {
         ac[key][item.method].parameters.push(
           ...item.parameters.map((param) => ({
@@ -251,7 +240,6 @@ if (option === "install") {
           }))
         );
       }
-
       if (item.headers && item.headers.length) {
         ac[key][item.method].parameters.push(
           ...item.headers
@@ -263,9 +251,7 @@ if (option === "install") {
             }))
         );
       }
-
       const requestBody = generateRequestBody(item);
-
       if (requestBody) {
         ac[key][item.method].requestBody = requestBody;
       }
@@ -273,9 +259,6 @@ if (option === "install") {
       return ac;
     }, {}),
   };
-
-  // Reste du code inchangé
-
   fs.writeFileSync(outputPath, JSON.stringify(swagger, null, 4));
   console.log(
     `Documentation Swagger générée et écrite dans le fichier json avec succès: ${outputPath}`
@@ -284,19 +267,12 @@ if (option === "install") {
   if (!inputPath) {
     throw new Error("Missing Input Path argument!");
   }
-  //verifier si le fichier de sortie a été specifié
-  if (outputPath === "./api-docs.json") {
-    outputPath = "./annotations.php";
-  }
+
   // Script de génération Annotations PHP
   const swaggerData = JSON.parse(fs.readFileSync(inputPath, "utf-8"));
-  // Générer les annotations PHP
-  const phpAnnotations = generatePhpAnnotations(swaggerData);
-  // Écrire les annotations PHP dans le fichier de sortie
-  fs.writeFileSync(outputPath, phpAnnotations, "utf-8");
-  console.log(
-    `Annotations Swagger générées et écrites dans le fichier PHP avec succès: ${outputPath}`
-  );
+  const annotationsByTag = generatePhpAnnotationsByTag(swaggerData);
+  fs.mkdirSync("app/Http/Controllers/Annotations");
+  writePhpAnnotationFiles(annotationsByTag, swaggerData);
 } else if (option === "-y") {
   if (!inputPath) {
     throw new Error("Missing Input Path argument!");
@@ -319,161 +295,189 @@ if (option === "install") {
   );
 }
 
-function generatePhpAnnotations(swaggerData) {
-  let phpAnnotations = "<?php\n\n";
+function generatePhpAnnotationsByTag(swaggerData) {
+  const annotationsByTag = {};
+  if (swaggerData) {
+    Object.keys(swaggerData.paths).forEach((path) => {
+      const pathObject = swaggerData.paths[path];
+      Object.keys(pathObject).forEach((method) => {
+        const operation = pathObject[method];
+        const tags = operation.tags || [];
+        const summary = operation.summary || "";
+        const description = operation.description || "";
+        // Générer les annotations de chemin
+        tags.forEach((tag) => {
+          // Initialiser la chaîne d'annotations si elle n'existe pas
+          if (!annotationsByTag[tag]) {
+            annotationsByTag[tag] = "";
+          }
+          // Générer les annotations pour chaque opération
+          annotationsByTag[tag] += "\n";
+          annotationsByTag[tag] += ` * @OA\\${method.toUpperCase()}(\n`;
+          annotationsByTag[tag] += ` *     path="${path}",\n`;
+          annotationsByTag[tag] += ` *     summary="${summary}",\n`;
+          annotationsByTag[tag] += ` *     description="${description}",\n`;
+          // Générer les annotations pour la sécurité
+          annotationsByTag[tag] += ` *         security={\n`;
+          annotationsByTag[tag] += ` *    {       "BearerAuth": {}}\n`;
+          annotationsByTag[tag] += ` *         },\n`;
+          // Générer les annotations pour les réponses
+          if (operation.responses) {
+            const responseCodes = Object.keys(operation.responses);
+            responseCodes.forEach((responseCode) => {
+              const response = operation.responses[responseCode];
+              const responseDescription = response.description || "";
+
+              annotationsByTag[
+                tag
+              ] += ` * @OA\\Response(response="${responseCode}", description="${responseDescription}"`;
+
+              // Générer les annotations pour le contenu de la réponse
+              if (response.content) {
+                const contentTypes = Object.keys(response.content);
+
+                if (contentTypes.length > 0) {
+                  const firstContentType = contentTypes[0];
+
+                  if (response.content[firstContentType].examples) {
+                    const examples =
+                      response.content[firstContentType].examples;
+
+                    if (examples["application/json"]) {
+                      annotationsByTag[tag] += ", @OA\\JsonContent(";
+                      annotationsByTag[
+                        tag
+                      ] += `example="${examples["application/json"]}"`;
+                      annotationsByTag[tag] += "),";
+                    }
+                  }
+                }
+              }
+
+              annotationsByTag[tag] += "),\n";
+            });
+          }
+          // Générer les annotations pour les paramètres
+          if (operation.parameters) {
+            operation.parameters.forEach((parameter) => {
+              const inType = parameter.in;
+              const parameterName = parameter.name;
+              const parameterType = parameter.type || "string";
+              const parameterRequired = parameter.required ? "true" : "false";
+              annotationsByTag[
+                tag
+              ] += ` *     @OA\\Parameter(in="${inType}", name="${parameterName}", `;
+              annotationsByTag[
+                tag
+              ] += `required=${parameterRequired}, @OA\\Schema(type="${parameterType}")\n`;
+              annotationsByTag[tag] += " * ),\n";
+            });
+          }
+          // Générer les annotations pour le requestBody
+          if (operation.requestBody) {
+            const requestBody = operation.requestBody;
+            const contentTypes = Object.keys(requestBody.content);
+
+            annotationsByTag[tag] += ` *     @OA\\RequestBody(\n`;
+            annotationsByTag[tag] += ` *         required=true,\n`;
+
+            if (contentTypes.length > 0) {
+              const firstContentType = contentTypes[0];
+              let contentType;
+              if (
+                method.toUpperCase() === "PUT" ||
+                method.toUpperCase() === "PATCH"
+              ) {
+                contentType = "application/x-www-form-urlencoded";
+              } else {
+                contentType = "multipart/form-data";
+              }
+              annotationsByTag[tag] += ` *         @OA\\MediaType(\n`;
+              annotationsByTag[
+                tag
+              ] += ` *             mediaType="${contentType}",\n`;
+              annotationsByTag[tag] += ` *             @OA\\Schema(\n`;
+              annotationsByTag[tag] += ` *                 type="object",\n`;
+              annotationsByTag[tag] += ` *                 properties={\n`;
+
+              // Générer les annotations pour chaque propriété du formulaire
+              const formProperties =
+                requestBody.content[firstContentType].schema.properties;
+              Object.keys(formProperties).forEach((propertyName) => {
+                const property = formProperties[propertyName];
+                const propertyType = property.type || "string";
+
+                annotationsByTag[
+                  tag
+                ] += ` *                     @OA\\Property(property="${propertyName}", type="${propertyType}"`;
+                if (property.format === "binary") {
+                  annotationsByTag[tag] += `, format="binary"`;
+                }
+
+                annotationsByTag[tag] += `),\n`;
+              });
+
+              annotationsByTag[tag] += ` *                 },\n`;
+              annotationsByTag[tag] += ` *             ),\n`;
+              annotationsByTag[tag] += ` *         ),\n`;
+            }
+
+            annotationsByTag[tag] += ` *     ),\n`;
+          }
+          if (operation.tags) {
+            annotationsByTag[tag] += ` *     tags={"${operation.tags.join(
+              '","'
+            )}"},\n`;
+          }
+          annotationsByTag[tag] += `*),\n\n`;
+        });
+      });
+    });
+  }
+  return annotationsByTag;
+}
+function writePhpAnnotationFiles(annotationsByTag, swaggerData) {
+  let annotations = "<?php\n\n";
+   annotations += `namespace App\\Http\\Controllers\\Annotations ;\n\n`;
   // Générer les annotations de sécurité
   if (swaggerData.components && swaggerData.components.securitySchemes) {
     const securitySchemes = swaggerData.components.securitySchemes;
     Object.keys(securitySchemes).forEach((schemeName) => {
       const securityScheme = securitySchemes[schemeName];
-      phpAnnotations += "/**\n * @OA\\Security(\n";
-      phpAnnotations += " *     security={\n";
-      phpAnnotations += ` *         "${schemeName}": {}\n`;
-      phpAnnotations += " *     }),\n";
-      phpAnnotations += "\n * @OA\\SecurityScheme(\n";
-      phpAnnotations += ` *     securityScheme="${schemeName}",\n`;
-      phpAnnotations += ` *     type="${securityScheme.type}",\n`;
-      phpAnnotations += ` *     scheme="${securityScheme.scheme}",\n`;
-      phpAnnotations += ` *     bearerFormat="${securityScheme.bearerFormat}"),\n`;
+      annotations += "/**\n * @OA\\Security(\n";
+      annotations += " *     security={\n";
+      annotations += ` *         "${schemeName}": {}\n`;
+      annotations += " *     }),\n";
+      annotations += "\n * @OA\\SecurityScheme(\n";
+      annotations += ` *     securityScheme="${schemeName}",\n`;
+      annotations += ` *     type="${securityScheme.type}",\n`;
+      annotations += ` *     scheme="${securityScheme.scheme}",\n`;
+      annotations += ` *     bearerFormat="${securityScheme.bearerFormat}"),\n`;
     });
   }
   // Générer les annotations d'information
   if (swaggerData.info) {
-    phpAnnotations += "\n * @OA\\Info(\n";
+    annotations += "\n * @OA\\Info(\n";
     const info = swaggerData.info;
-    phpAnnotations += ` *     title="${info.title}",\n`;
-    phpAnnotations += ` *     description="${info.description}",\n`;
-    phpAnnotations += ` *     version="${info.version}"),\n`;
+    annotations += ` *     title="${info.title}",\n`;
+    annotations += ` *     description="${info.description}",\n`;
+    annotations += ` *     version="${info.version}"),\n`;
   }
   // Générer les annotations de consommation
   if (swaggerData.consumes) {
-    phpAnnotations += "\n * @OA\\Consumes({\n";
-    phpAnnotations += ` *     "${swaggerData.consumes.join('","')}"\n`;
-    phpAnnotations += " * }),\n */\n\n\n";
+    annotations += "\n * @OA\\Consumes({\n";
+    annotations += ` *     "${swaggerData.consumes.join('","')}"\n`;
+    annotations += " * }),\n\n";
+    annotations += " *\n";
   }
-  // Générer les annotations de tags
-  if (swaggerData.tags) {
-    swaggerData.tags.forEach((tag) => {
-      phpAnnotations += "\n * @OA\\Tag(\n";
-      phpAnnotations += ` *     name="${tag.name}",\n`;
-      phpAnnotations += ` *     description="${tag.description}"\n`;
-      phpAnnotations += " * ),\n */\n\n\n";
-    });
-  }
-  // Générer les annotations de chemin
-  if (swaggerData.paths) {
-    Object.keys(swaggerData.paths).forEach((path) => {
-      const pathObject = swaggerData.paths[path];
-      Object.keys(pathObject).forEach((method) => {
-        const operation = pathObject[method];
-        const summary = operation.summary || "";
-        const description = operation.description || "";
-        // Générer les annotations pour chaque opération
-        phpAnnotations += "/**\n";
-        phpAnnotations += ` * @OA\\${method.toUpperCase()}(\n`;
-        phpAnnotations += ` *     path="${path}",\n`;
-        phpAnnotations += ` *     summary="${summary}",\n`;
-        phpAnnotations += ` *     description="${description}",\n`;
-        // Générer les annotations pour la sécurité
-        phpAnnotations += ` *         security={\n`;
-        phpAnnotations += ` *    {       "BearerAuth": {}}\n`;
-        phpAnnotations += ` *         },\n`;
-        // Générer les annotations pour les réponses
-        if (operation.responses) {
-          const responseCodes = Object.keys(operation.responses);
-          responseCodes.forEach((responseCode) => {
-            const response = operation.responses[responseCode];
-            const responseDescription = response.description || "";
-
-            phpAnnotations += ` * @OA\\Response(response="${responseCode}", description="${responseDescription}"`;
-
-            // Générer les annotations pour le contenu de la réponse
-            if (response.content) {
-              const contentTypes = Object.keys(response.content);
-
-              if (contentTypes.length > 0) {
-                const firstContentType = contentTypes[0];
-
-                if (response.content[firstContentType].examples) {
-                  const examples = response.content[firstContentType].examples;
-
-                  if (examples["application/json"]) {
-                    phpAnnotations += ", @OA\\JsonContent(";
-                    phpAnnotations += `example="${examples["application/json"]}"`;
-                    phpAnnotations += "),";
-                  }
-                }
-              }
-            }
-
-            phpAnnotations += "),\n";
-          });
-        }
-        // Générer les annotations pour les paramètres
-        if (operation.parameters) {
-          operation.parameters.forEach((parameter) => {
-            const inType = parameter.in;
-            const parameterName = parameter.name;
-            const parameterType = parameter.type || "string";
-            const parameterRequired = parameter.required ? "true" : "false";
-            phpAnnotations += ` *     @OA\\Parameter(in="${inType}", name="${parameterName}", `;
-            phpAnnotations += `required=${parameterRequired}, @OA\\Schema(type="${parameterType}")\n`;
-            phpAnnotations += " * ),\n";
-          });
-        }
-        // Générer les annotations pour le requestBody
-        if (operation.requestBody) {
-          const requestBody = operation.requestBody;
-          const contentTypes = Object.keys(requestBody.content);
-
-          phpAnnotations += ` *     @OA\\RequestBody(\n`;
-          phpAnnotations += ` *         required=true,\n`;
-
-          if (contentTypes.length > 0) {
-            const firstContentType = contentTypes[0];
-            let contentType;
-            if (
-              method.toUpperCase() === "PUT" ||
-              method.toUpperCase() === "PATCH"
-            ) {
-              contentType = "application/x-www-form-urlencoded";
-            } else {
-              contentType = "multipart/form-data";
-            }
-            phpAnnotations += ` *         @OA\\MediaType(\n`;
-            phpAnnotations += ` *             mediaType="${contentType}",\n`;
-            phpAnnotations += ` *             @OA\\Schema(\n`;
-            phpAnnotations += ` *                 type="object",\n`;
-            phpAnnotations += ` *                 properties={\n`;
-
-            // Générer les annotations pour chaque propriété du formulaire
-            const formProperties =
-              requestBody.content[firstContentType].schema.properties;
-            Object.keys(formProperties).forEach((propertyName) => {
-              const property = formProperties[propertyName];
-              const propertyType = property.type || "string";
-
-              phpAnnotations += ` *                     @OA\\Property(property="${propertyName}", type="${propertyType}"`;
-              if (property.format === "binary") {
-                phpAnnotations += `, format="binary"`;
-              }
-
-              phpAnnotations += `),\n`;
-            });
-
-            phpAnnotations += ` *                 },\n`;
-            phpAnnotations += ` *             ),\n`;
-            phpAnnotations += ` *         ),\n`;
-          }
-
-          phpAnnotations += ` *     ),\n`;
-        }
-        if (operation.tags) {
-          phpAnnotations += ` *     tags={"${operation.tags.join('","')}"},\n`;
-        }
-        phpAnnotations += `*),\n */\n\n`;
-      });
-    });
-  }
-  return phpAnnotations;
+  Object.keys(annotationsByTag).forEach((tag) => {
+    const phpAnnotations = annotations + annotationsByTag[tag];
+    const capitalizedTag = tag.charAt(0).toUpperCase() + tag.slice(1)+"AnnotationController";
+    const name =capitalizedTag.replace(/[^a-z0-9]/gi, "");
+    const fileName = name  + ".php";
+    fs.writeFileSync("app/Http/Controllers/Annotations/"+fileName, phpAnnotations + `\n*/\n\n class ${name} {}\n`, "utf-8");
+    console.log(
+      `Annotations Swagger pour le tag "${tag}" générées et écrites dans le fichier : ${fileName}`
+    );
+  });
 }
