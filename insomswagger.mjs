@@ -34,8 +34,8 @@ if (option === "install") {
       const artisanOutput = await runCommand(artisanCommand);
       console.log("Artisan Output:", artisanOutput);
       // Exécutez la commande Optimize
-      const optimizeCommand = await runCommand(optimizeCommand);
-      console.log("Optimize Output:", optimizeCommand);
+      const optimizedCommand = await runCommand(optimizeCommand);
+      console.log("Optimize Output:", optimizedCommand);
       // Exécutez la commande Artisan pour démarrer le serveur
       console.log(
         "darkaonline/l5-swagger installé avec succès. Serveur en cours d'exécution."
